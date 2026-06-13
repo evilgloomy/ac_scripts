@@ -30,6 +30,10 @@ local CLUTCH_HARD_LOCK  = true   -- forcing the engaged gear leaves the clutch
                                  -- this hard-locks it while driving. Set false
                                  -- for plain V4 behavior (slip returns).
 local CLUTCH_HOME       = 0.98   -- clutch at/above this counts as fully home
+local AUTO_LAUNCH_KMH   = 12     -- in AUTO, below this speed the clutch is slipped
+                                 -- for stall-free creep and launch from a stop
+local AUTO_CREEP        = 0.08   -- idle clutch engagement off the brake in AUTO
+                                 -- (gentle creep; set 0 to disable)
 
 local PROFILES = {
   NORMAL = {
@@ -339,8 +343,27 @@ function script.update(dt)
   -- the real clutch instead so creep, clutch starts and stalling stay intact.
   local clutch = math.saturate(carPh.clutch)
   local lockState = 'off'
+
+  -- AUTO launch/creep: at a standstill the engine can't be hard-locked to the
+  -- stationary wheels or it stalls, and there's no driver clutch in AUTO to slip.
+  -- So below AUTO_LAUNCH_KMH we set the coupling ourselves: gentle creep off the
+  -- brake, more with throttle, fully locked once rolling. nil = not launching.
+  local autoLaunch = nil
+  if autoMode and engaged > 0 and car.speedKmh < AUTO_LAUNCH_KMH then
+    local roll = math.saturate(car.speedKmh / AUTO_LAUNCH_KMH)
+    autoLaunch = math.max(roll, carPh.gas)
+    if AUTO_CREEP > 0 and carPh.brake < 0.1 then
+      autoLaunch = math.max(autoLaunch, AUTO_CREEP)
+    end
+    autoLaunch = math.saturate(autoLaunch)
+  end
+
   if CLUTCH_HARD_LOCK and idClutchOverride ~= nil then
-    if engaged > 0 and clutch >= CLUTCH_HOME then
+    if autoLaunch ~= nil then
+      ac.overrideSpecificValue(idClutchOverride, autoLaunch)
+      ac.overrideSpecificValue(idOpenThreshold, 0)      -- allow slip while launching
+      lockState = string.format('AUTO launch %.2f', autoLaunch)
+    elseif engaged > 0 and clutch >= CLUTCH_HOME then
       ac.overrideSpecificValue(idClutchOverride, 1.0)   -- couple fully
       ac.overrideSpecificValue(idOpenThreshold, 0.05)   -- only open below 0.05
       lockState = 'LOCKED'

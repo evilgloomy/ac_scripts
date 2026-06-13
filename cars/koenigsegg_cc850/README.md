@@ -75,6 +75,10 @@ as `ESS detected input`.
 - The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
   shows the virtual slot (or the AUTO gear) without touching physics. Toggle
   with `SHOW_VIRTUAL_GEAR`.
+- In **AUTO (D)** there's no driver clutch, so the script slips the clutch itself
+  below `AUTO_LAUNCH_KMH`: a gentle creep off the brake, more as you press the
+  throttle, fully locked once rolling. This lets it pull away from a standstill
+  without stalling instead of staying stuck with the clutch disengaged.
 - The drivetrain clutch is **hard-locked** while driving (`CLUTCH_HARD_LOCK`).
   Forcing the engaged gear leaves the clutch coupling a few percent open on its
   own — felt most in tall gears — so the script overrides the coupling to a
@@ -97,6 +101,9 @@ Everything lives at the top of `script.lua`:
 - `CLUTCH_HARD_LOCK` (on by default; `false` = plain bypass, slip returns) and
   `CLUTCH_HOME` (clutch fraction at/above which the lock engages — raise toward
   1.0 if any slip remains, lower if the clutch grabs too early off the line).
+- `AUTO_LAUNCH_KMH` (speed below which AUTO slips the clutch for a stall-free
+  launch from a stop) and `AUTO_CREEP` (idle creep engagement off the brake in
+  AUTO; `0` disables creep).
 
 ## Known limitations
 
