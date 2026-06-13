@@ -59,9 +59,13 @@ nine gears.
   pass through to it for native shift animations, sounds and UI; presses
   beyond the virtual limits are swallowed.
 - The drivetrain clutch coupling tracks the clutch input
-  (`DrivetrainClutchOverride`) and hard-locks when the clutch is fully home,
-  eliminating residual slip in tall gears. Controller autoclutch and a real
-  clutch pedal both feed the same field, so both "just work".
+  (`DrivetrainClutchOverride`). When the clutch is fully home (at/above
+  `CLUTCH_HOME_THRESHOLD`) the coupling is snapped to a clean `1.0` hard lock
+  rather than the live clutch value — AC's autoclutch parks that field a hair
+  below 1.0 while cruising, and passing it straight through left the drivetrain
+  a fraction of a percent open every frame, which was the residual slip felt in
+  tall gears. Controller autoclutch and a real clutch pedal both feed the same
+  field, so both "just work".
 - Gear-ratio blending across shifts (`ac.setGearsFinalRatio`) smooths RPM
   transitions: ~0.1 s in NORMAL auto, ~0.04 s in TRACK / manual (the LST
   engages near-instantly).
@@ -73,7 +77,10 @@ Everything lives at the top of `script.lua`:
 - `PROFILES.NORMAL` / `PROFILES.TRACK`: gear maps, throttle exponent,
   AUTO shift RPMs, shift blend time, shift cooldown, damper multipliers.
 - `H_PATTERN`, `REVERSE_MAX_KMH`, `PULSE_INTERVAL`, `MAX_PULSES`,
-  `CLUTCH_OPEN_THRESHOLD`.
+  `CLUTCH_OPEN_THRESHOLD`, `CLUTCH_HOME_THRESHOLD` (at/above this the clutch is
+  treated as fully home and the drivetrain is snapped to a clean hard lock —
+  raise it toward 1.0 if you still feel residual slip, lower it if the clutch
+  feels like it grabs too early off the line).
 
 ## Known limitations
 

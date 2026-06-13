@@ -31,6 +31,15 @@ local CLUTCH_OPEN_THRESHOLD  = 0.3    -- carPh.clutch below this = drivetrain
                                       -- and a real clutch pedal both write
                                       -- this field, so honoring it gives
                                       -- correct behavior in both cases.
+local CLUTCH_HOME_THRESHOLD  = 0.98   -- at/above this the clutch counts as
+                                      -- fully home and the coupling is snapped
+                                      -- to a clean 1.0 hard lock instead of the
+                                      -- live (slightly dithered) clutch value.
+                                      -- AC's autoclutch parks this field a hair
+                                      -- below 1.0 while cruising; passing that
+                                      -- through left the drivetrain a fraction
+                                      -- of a percent open every frame, which is
+                                      -- the residual slip felt in tall gears.
 
 local PROFILES = {
   NORMAL = {
@@ -331,16 +340,25 @@ function script.update(dt)
 
   -- Clutch handling. Preferred path: drive the drivetrain clutch coupling
   -- directly from carPh.clutch (controller autoclutch and a real pedal both
-  -- write that field) and hard-lock it whenever the clutch is fully home —
-  -- this is what stops the constant few-percent slip in high gears.
+  -- write that field). Whenever the clutch is fully home, force a CLEAN hard
+  -- lock by overriding the coupling to exactly 1.0 — passing the live clutch
+  -- value through here is what left a fraction of a percent of the coupling
+  -- open every frame (AC's autoclutch parks the field a hair below 1.0 while
+  -- cruising) and produced the residual slip felt most in tall gears. Only
+  -- when the clutch is genuinely in use (below home) do we track the real
+  -- input so shifts and launches still slip the clutch normally.
   -- Fallback path (older CSP): drop the override to raw neutral while the
   -- clutch is open so the dip at least decouples the drivetrain.
   local clutch = math.saturate(carPh.clutch)
   local rawGear = engaged + 1
   if idClutchOverride ~= nil then
-    local locked = clutch > 0.99
-    ac.overrideSpecificValue(idClutchOverride, clutch)
-    ac.overrideSpecificValue(idOpenThreshold, locked and 0.05 or 0)
+    if clutch >= CLUTCH_HOME_THRESHOLD then
+      ac.overrideSpecificValue(idClutchOverride, 1.0)
+      ac.overrideSpecificValue(idOpenThreshold, 0.05)
+    else
+      ac.overrideSpecificValue(idClutchOverride, clutch)
+      ac.overrideSpecificValue(idOpenThreshold, 0)
+    end
   elseif not autoMode and clutch < CLUTCH_OPEN_THRESHOLD then
     rawGear = 1            -- raw neutral
   end
@@ -383,4 +401,5 @@ function script.update(dt)
   ac.debug('ESS rpm', carPh.rpm)
   ac.debug('ESS clutch (1=engaged 0=open)', carPh.clutch)
   ac.debug('ESS clutch lock path', idClutchOverride ~= nil and 'direct override' or 'neutral fallback')
+  ac.debug('ESS clutch hard-locked', idClutchOverride ~= nil and clutch >= CLUTCH_HOME_THRESHOLD)
 end
