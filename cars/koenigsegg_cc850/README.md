@@ -56,6 +56,12 @@ nine gears.
   shift, so its clutch/engagement logic never runs alongside the forced gear —
   that parallel box is exactly what caused the residual drivetrain slip, and
   leaving it parked is what keeps this version clean.
+- With an **H-pattern shifter** (`H_PATTERN = true`) there are no paddle inputs
+  to swallow — the gate is selected directly via `carPh.requestedGearIndex`, and
+  AC would otherwise engage that raw 1-6 gate and override the forced gear. So
+  the script reads the gate, then writes the mapped LST gear back into
+  `requestedGearIndex` (the dog-leg remap technique) so AC's box engages what
+  you intend. Manual only — AUTO leaves the input alone.
 - The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
   shows the virtual slot (or the AUTO gear) without touching physics. Toggle
   with `SHOW_VIRTUAL_GEAR`.

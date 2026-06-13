@@ -124,6 +124,7 @@ local blendTime  = MANUAL_SHIFT_TIME
 local extraAPrev, extraCPrev = false, false
 local prevUp, prevDown = false, false
 local controlsWritable = nil
+local requestedWritable = nil
 local lastProfile = nil
 local warned = false
 
@@ -191,6 +192,9 @@ function script.update(dt)
 
   if controlsWritable == nil then
     controlsWritable = pcall(function() carPh.gearUp = carPh.gearUp end)
+  end
+  if requestedWritable == nil then
+    requestedWritable = pcall(function() carPh.requestedGearIndex = carPh.requestedGearIndex end)
   end
   if controlsWritable then
     carPh.gearUp, carPh.gearDown = false, false
@@ -295,6 +299,18 @@ function script.update(dt)
   ac.overrideSpecificValue(ac.CarPhysicsValueID.DrivetrainEngagedGear, engaged + 1)
   ac.setGearsFinalRatio(finalRatio * blendMult)
 
+  -- With an H-pattern shifter the gate is read from requestedGearIndex at the
+  -- top of this frame; here we write the mapped LST gear back so AC's own box
+  -- engages it instead of the raw 1-6 gate (which otherwise overrides our
+  -- forced gear every frame). Same remap technique as CSP's dog-leg example.
+  -- Manual only: in AUTO the shifter sits in the non-drivable auto gate and the
+  -- override already wins, so we leave requestedGearIndex alone to avoid ever
+  -- writing a drivable gear that would bounce us out of D. Sequential/controller
+  -- mode doesn't need this at all — gearUp/gearDown are zeroed instead.
+  if H_PATTERN and not autoMode and requestedWritable then
+    carPh.requestedGearIndex = engaged + 1   -- raw: 0=R, 1=N, 2=1st
+  end
+
   -- ====================================================================
   -- 5b. CLUTCH HARD-LOCK (kills the override-driven drivetrain slip)
   -- ====================================================================
@@ -329,6 +345,8 @@ function script.update(dt)
   ac.debug('ESS engaged physical gear', engaged)
   ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
   ac.debug('ESS controls writable', controlsWritable)
+  ac.debug('ESS requested writable', requestedWritable)
+  ac.debug('ESS requestedGearIndex (raw)', carPh.requestedGearIndex)
   ac.debug('ESS rpm', carPh.rpm)
   ac.debug('ESS clutch (1=home 0=open)', carPh.clutch)
   ac.debug('ESS drivetrain lock', lockState)
