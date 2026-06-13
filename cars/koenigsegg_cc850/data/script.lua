@@ -131,6 +131,7 @@ local blendTime  = MANUAL_SHIFT_TIME
 local extraAPrev, extraCPrev = false, false
 local prevUp, prevDown = false, false
 local controlsWritable = nil
+local requestedWritable = nil
 local lastRaw    = nil     -- previous requestedGearIndex, to spot H-shifter moves
 local lastInput  = 'none'  -- 'H-pattern' or 'sequential', auto-detected
 local lastProfile = nil
@@ -200,6 +201,9 @@ function script.update(dt)
 
   if controlsWritable == nil then
     controlsWritable = pcall(function() carPh.gearUp = carPh.gearUp end)
+  end
+  if requestedWritable == nil then
+    requestedWritable = pcall(function() carPh.requestedGearIndex = carPh.requestedGearIndex end)
   end
   if controlsWritable then
     carPh.gearUp, carPh.gearDown = false, false
@@ -314,6 +318,17 @@ function script.update(dt)
 
   ac.overrideSpecificValue(ac.CarPhysicsValueID.DrivetrainEngagedGear, engaged + 1)
   ac.setGearsFinalRatio(finalRatio * blendMult)
+
+  -- Get AC's own gearbox out of the way in H-pattern: park its box in neutral so
+  -- it can't engage the raw gate gear and fight the forced gear. This is the same
+  -- neutral box controller mode already runs in, where the override drives
+  -- cleanly. We've already read the gate this frame (section 1), and lastRaw is
+  -- set to the parked value so our own write isn't misread as a new gate. AUTO
+  -- and sequential are left untouched.
+  if lastInput == 'H-pattern' and not autoMode and requestedWritable then
+    carPh.requestedGearIndex = 1   -- raw 1 = neutral
+    lastRaw = 1
+  end
 
   -- ====================================================================
   -- 5b. CLUTCH HARD-LOCK (kills the override-driven drivetrain slip)
