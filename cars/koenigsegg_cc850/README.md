@@ -67,9 +67,11 @@ as `ESS detected input`.
   swallows — so `requestedGearIndex` stays parked and the two inputs can't be
   confused. Either way it's the same virtual slot, so the normal slot → mapped
   LST gear logic takes over (gate 1 is LST 2nd in NORMAL, LST 3rd in TRACK).
-- In H-pattern, after reading the gate the script parks AC's own gearbox in
-  neutral (`requestedGearIndex = 1`) so it can't engage the raw gate gear and
-  fight the forced gear — the same neutral-box state controller mode relies on.
+- In H-pattern, after reading the gate the script drives AC's own gearbox to the
+  *mapped* gear by writing `requestedGearIndex = engaged + 1`. AC's box gear is
+  what sets the actual ratio, so the box has to sit in the mapped gear — e.g.
+  gate 1 in TRACK puts AC's box in 3rd, giving 3rd's ratio. AC re-samples the
+  physical gate before the next read, so this doesn't disturb gate reading.
 - The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
   shows the virtual slot (or the AUTO gear) without touching physics. Toggle
   with `SHOW_VIRTUAL_GEAR`.

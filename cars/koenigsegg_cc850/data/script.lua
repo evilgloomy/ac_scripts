@@ -319,15 +319,16 @@ function script.update(dt)
   ac.overrideSpecificValue(ac.CarPhysicsValueID.DrivetrainEngagedGear, engaged + 1)
   ac.setGearsFinalRatio(finalRatio * blendMult)
 
-  -- Get AC's own gearbox out of the way in H-pattern: park its box in neutral so
-  -- it can't engage the raw gate gear and fight the forced gear. This is the same
-  -- neutral box controller mode already runs in, where the override drives
-  -- cleanly. We've already read the gate this frame (section 1), and lastRaw is
-  -- set to the parked value so our own write isn't misread as a new gate. AUTO
-  -- and sequential are left untouched.
+  -- H-pattern: drive AC's own gearbox to the MAPPED gear (not the raw gate), so
+  -- the real ratio is the mapped gear's. AC's box gear is what sets the ratio —
+  -- when the box sits in a gear the override alone doesn't change it — so e.g.
+  -- gate 1 in TRACK must put AC's box in 3rd (engaged), giving 3rd's ratio.
+  -- We don't touch lastRaw: AC re-samples the physical gate into
+  -- requestedGearIndex before the next frame's read (section 1), so writing the
+  -- mapped gear here doesn't disturb gate reading (the dog-leg remap pattern).
+  -- AUTO and sequential are left untouched.
   if lastInput == 'H-pattern' and not autoMode and requestedWritable then
-    carPh.requestedGearIndex = 1   -- raw 1 = neutral
-    lastRaw = 1
+    carPh.requestedGearIndex = engaged + 1   -- raw: 0=R, 1=N, 2=1st, ...
   end
 
   -- ====================================================================
