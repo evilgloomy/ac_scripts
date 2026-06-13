@@ -52,6 +52,10 @@ local PROFILES = {
 
 local carPh = ac.accessCarPhysics()
 
+-- carPh.gear (physics-side raw gear) isn't exposed on every CSP build; probe
+-- once so the debug read-out below can degrade gracefully instead of erroring.
+local hasCarPhGear = pcall(function() return carPh.gear end)
+
 -- Read drivetrain numbers so the ini stays the single source of truth
 local cfg = ac.INIConfig.carData(car.index, 'drivetrain.ini')
 local finalRatio = cfg:get('GEARS', 'FINAL', 3.2)
@@ -277,15 +281,29 @@ function script.update(dt)
   ac.setGearsFinalRatio(finalRatio * blendMult)
 
   -- ====================================================================
-  -- 6. DISPLAY + DEBUG
+  -- 6. COSMETIC GEAR DISPLAY (render thread only — never touches physics)
   -- ====================================================================
+  -- ac.overrideCarState('gear', …) overrides only the value AC's rendering
+  -- thread uses for the dash; the SDK is explicit it "doesn't affect actual
+  -- physics". Encoding matches car.gear: -1 = R, 0 = N, 1..n = forward gears,
+  -- which is exactly how `slot` is numbered, so the dash shows the virtual
+  -- slot directly. In AUTO we show the live physical gear the script engaged.
+  -- Pushed every frame because the forced engaged gear keeps writing the
+  -- physical LST gear into the same value otherwise.
+  local displayGear = autoMode and autoGear or slot
   if SHOW_VIRTUAL_GEAR then
-    ac.overrideCarState('gear', autoMode and autoGear or slot)
+    ac.overrideCarState('gear', displayGear)
   end
 
   ac.debug('ESS mode', autoMode and 'AUTO (D)' or ('MANUAL ' .. profile))
   ac.debug('ESS virtual slot', slot)
   ac.debug('ESS engaged physical gear', engaged)
+  -- Display diagnostics: if 'pushed' is right but the dash shows something
+  -- else, the override is being ignored by this car's dash binding. Compare
+  -- against the raw physics gear (carPh.gear) and the render gear (car.gear).
+  ac.debug('ESS display gear (pushed)', displayGear)
+  ac.debug('ESS carPh.gear (physics raw)', hasCarPhGear and carPh.gear or 'n/a')
+  ac.debug('ESS car.gear (render)', car.gear)
   ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
   ac.debug('ESS controls writable', controlsWritable)
   ac.debug('ESS rpm', carPh.rpm)

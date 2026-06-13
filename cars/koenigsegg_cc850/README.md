@@ -39,7 +39,11 @@ nine gears.
    SUPPORTS_SHIFTER=1        ; required, even for controller use
    ```
 4. Drive. Open the **Lua Debug** app in-game to see live `ESS …` values
-   (mode, virtual slot, engaged physical gear, RPM, damper API).
+   (mode, virtual slot, engaged physical gear, RPM, damper API). The display
+   diagnostics — `display gear (pushed)`, `carPh.gear (physics raw)` and
+   `car.gear (render)` — show whether the cosmetic dash override is landing:
+   if `pushed` is correct but the dash shows a different number, this car's
+   dash binding is ignoring the render override.
 
 ## How it works (short version)
 
