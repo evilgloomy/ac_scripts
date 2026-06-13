@@ -57,14 +57,11 @@ nine gears.
   that parallel box is exactly what caused the residual drivetrain slip, and
   leaving it parked is what keeps this version clean.
 - With an **H-pattern shifter** (`H_PATTERN = true`) the gate is selected
-  directly via `carPh.requestedGearIndex` and AC engages that physical gate
-  (1-6). The script never writes that field (writing it destroys the gate read);
-  it only reads the gate to set the virtual slot. To make the gate *behave* like
-  the mapped LST gear, it reads the gear AC actually engaged (`carPh.gear`) and
-  scales the final ratio so the effective ratio equals the mapped gear's — e.g.
-  gate 1 in NORMAL drives exactly like LST 2nd. This is self-correcting: if the
-  `DrivetrainEngagedGear` override wins the factor is 1; if AC keeps the raw
-  gate, the factor remaps its ratio onto the LST gear's. AUTO is unaffected.
+  directly via `carPh.requestedGearIndex`. The script reads it and maps the gate
+  straight to the virtual slot (gate 1 → slot 1, gate 2 → slot 2, …), exactly the
+  same slot the paddles drive in controller mode. From there the normal slot →
+  mapped LST gear logic takes over — so gate 1 is LST 2nd in NORMAL, LST 3rd in
+  TRACK. Gate 7 engages AUTO. The script never writes the input field.
 - The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
   shows the virtual slot (or the AUTO gear) without touching physics. Toggle
   with `SHOW_VIRTUAL_GEAR`.
@@ -98,11 +95,6 @@ Everything lives at the top of `script.lua`:
   are inactive).
 - Extended physics makes the car CSP-only and will fail checksum on strict
   online servers.
-- In controller/sequential mode AC's box is bypassed, so paddle shifts don't
-  trigger AC's native shift animation/sound; the dash gear is driven by the
-  display-only override instead. The engaged physical gear is always visible in
-  the Lua Debug app.
-- H-pattern only: the ratio correction needs `carPh.gear` (the gear AC actually
-  engaged), which isn't exposed on every CSP build. If it reads `n/a` in the Lua
-  Debug app, the correction is skipped and gates drive in their raw ratio rather
-  than the mapped LST ratio.
+- AC's box is bypassed, so shifts don't trigger AC's native shift
+  animation/sound; the dash gear is driven by the display-only override instead.
+  The engaged physical gear is always visible in the Lua Debug app.

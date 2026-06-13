@@ -299,23 +299,8 @@ function script.update(dt)
     blendMult = 1
   end
 
-  -- H-pattern ratio correction. An H-shifter writes its gate straight into
-  -- requestedGearIndex and AC engages that physical gate (1-6); we can't stop it
-  -- without overwriting the input and destroying our own gate read. So instead of
-  -- fighting it, read the gear AC actually engaged (carPh.gear) and scale the
-  -- final ratio so the EFFECTIVE ratio equals the mapped LST gear's. This is
-  -- self-correcting: if the override below wins (AC already in `engaged`) the
-  -- factor is 1; if AC keeps the raw gate, the factor remaps the gate's ratio
-  -- onto the LST gear's, so e.g. gate 1 in NORMAL drives exactly like LST 2nd.
-  local acGear = (hasCarPhGear and carPh.gear or 0) - 1   -- 1-based forward gear
-  local ratioCorrection = 1
-  if H_PATTERN and not autoMode and engaged > 0
-      and acGear >= 1 and acGear <= gearsCount then
-    ratioCorrection = ratios[engaged] / ratios[acGear]
-  end
-
   ac.overrideSpecificValue(ac.CarPhysicsValueID.DrivetrainEngagedGear, engaged + 1)
-  ac.setGearsFinalRatio(finalRatio * blendMult * ratioCorrection)
+  ac.setGearsFinalRatio(finalRatio * blendMult)
 
   -- ====================================================================
   -- 5b. CLUTCH HARD-LOCK (kills the override-driven drivetrain slip)
@@ -347,13 +332,13 @@ function script.update(dt)
   end
 
   ac.debug('ESS mode', autoMode and 'AUTO (D)' or ('MANUAL ' .. profile))
+  ac.debug('ESS H_PATTERN flag', H_PATTERN)
   ac.debug('ESS virtual slot', slot)
   ac.debug('ESS engaged physical gear', engaged)
-  ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
-  ac.debug('ESS controls writable', controlsWritable)
   ac.debug('ESS requestedGearIndex (raw)', carPh.requestedGearIndex)
   ac.debug('ESS AC engaged gear (raw)', hasCarPhGear and carPh.gear or 'n/a')
-  ac.debug('ESS ratio correction', ratioCorrection)
+  ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
+  ac.debug('ESS controls writable', controlsWritable)
   ac.debug('ESS rpm', carPh.rpm)
   ac.debug('ESS clutch (1=home 0=open)', carPh.clutch)
   ac.debug('ESS drivetrain lock', lockState)
