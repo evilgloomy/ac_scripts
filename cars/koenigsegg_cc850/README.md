@@ -33,21 +33,13 @@ nine gears.
    [HEADER]
    VERSION=extended-2
    ```
-3. `data/drivetrain.ini` — required and recommended settings:
+3. `data/drivetrain.ini` — required setting:
    ```ini
    [GEARBOX]
    SUPPORTS_SHIFTER=1        ; required, even for controller use
-
-   [DOWNSHIFT_PROTECTION]
-   ACTIVE=0                  ; AC's internal box is cosmetic here; it must
-                             ; never refuse a shift
-
-   [DAMAGE]
-   RPM_WINDOW_K=0            ; prevent phantom gearbox damage on the
-                             ; cosmetic internal box
    ```
 4. Drive. Open the **Lua Debug** app in-game to see live `ESS …` values
-   (mode, virtual slot, engaged physical gear, clutch state, damper API).
+   (mode, virtual slot, engaged physical gear, RPM, damper API).
 
 ## How it works (short version)
 
@@ -55,17 +47,16 @@ nine gears.
   frame via `ac.overrideSpecificValue(ac.CarPhysicsValueID.DrivetrainEngagedGear, …)`
   — the same technique CSP's shared `automatic-transmission` module uses —
   so it behaves identically with paddles, keyboard, or an H-shifter.
-- AC's own gearbox keeps running as the *visible* box: legal paddle presses
-  pass through to it for native shift animations, sounds and UI; presses
-  beyond the virtual limits are swallowed.
-- The drivetrain clutch coupling tracks the clutch input
-  (`DrivetrainClutchOverride`). When the clutch is fully home (at/above
-  `CLUTCH_HOME_THRESHOLD`) the coupling is snapped to a clean `1.0` hard lock
-  rather than the live clutch value — AC's autoclutch parks that field a hair
-  below 1.0 while cruising, and passing it straight through left the drivetrain
-  a fraction of a percent open every frame, which was the residual slip felt in
-  tall gears. Controller autoclutch and a real clutch pedal both feed the same
-  field, so both "just work".
+- AC's own sequential box is **bypassed, not driven**: every frame the script
+  swallows the raw paddle inputs (`carPh.gearUp/gearDown = false`) and only
+  reads their rising edges to walk the virtual slot. AC's box is never asked to
+  shift, so its clutch/engagement logic never runs alongside the forced gear —
+  that parallel box is exactly what caused the residual drivetrain slip, and
+  leaving it parked is what keeps this version clean.
+- The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
+  shows the virtual slot (or the AUTO gear) without touching physics. Toggle
+  with `SHOW_VIRTUAL_GEAR`.
+- Clutch is left entirely to AC's own handling — there is no clutch override.
 - Gear-ratio blending across shifts (`ac.setGearsFinalRatio`) smooths RPM
   transitions: ~0.1 s in NORMAL auto, ~0.04 s in TRACK / manual (the LST
   engages near-instantly).
@@ -76,11 +67,8 @@ Everything lives at the top of `script.lua`:
 
 - `PROFILES.NORMAL` / `PROFILES.TRACK`: gear maps, throttle exponent,
   AUTO shift RPMs, shift blend time, shift cooldown, damper multipliers.
-- `H_PATTERN`, `REVERSE_MAX_KMH`, `PULSE_INTERVAL`, `MAX_PULSES`,
-  `CLUTCH_OPEN_THRESHOLD`, `CLUTCH_HOME_THRESHOLD` (at/above this the clutch is
-  treated as fully home and the drivetrain is snapped to a clean hard lock —
-  raise it toward 1.0 if you still feel residual slip, lower it if the clutch
-  feels like it grabs too early off the line).
+- `H_PATTERN`, `REVERSE_MAX_KMH`, `MANUAL_SHIFT_TIME`, `SHOW_VIRTUAL_GEAR`
+  (set `false` to show the physical LST gear on the dash instead of the slot).
 
 ## Known limitations
 
@@ -90,5 +78,7 @@ Everything lives at the top of `script.lua`:
   are inactive).
 - Extended physics makes the car CSP-only and will fail checksum on strict
   online servers.
-- In AUTO (D), the dash shows whatever AC's cosmetic box last displayed; the
-  engaged gear is visible in the Lua Debug app.
+- Because AC's sequential box is bypassed, paddle shifts don't trigger AC's
+  native shift animation/sound; the dash gear is driven by the display-only
+  override instead. The engaged physical gear is always visible in the Lua
+  Debug app.
