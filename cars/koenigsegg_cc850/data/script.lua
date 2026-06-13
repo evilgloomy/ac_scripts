@@ -18,7 +18,7 @@
 -- Toggle with EXTRA_A. EXTRA_C engages AUTO (D); with an H-pattern shifter
 -- slot 7 does the same. D shifts through all nine LST gears by RPM.
 
-local H_PATTERN         = false  -- set true for an H-pattern shifter
+local H_PATTERN         = true   -- true = H-pattern shifter, false = paddles/sequential
 local REVERSE_MAX_KMH   = 5      -- only shift into R below this speed
 local MANUAL_SHIFT_TIME = 0.04   -- LST engages near-instantly in manual
 local SHOW_VIRTUAL_GEAR = true   -- dash shows slot number, not physical gear

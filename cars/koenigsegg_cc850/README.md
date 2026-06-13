@@ -20,8 +20,8 @@ nine gears.
 |---|---|
 | `EXTRA A` | Toggle NORMAL / TRACK profile (manual mode only) |
 | `EXTRA C` | Toggle AUTO (D) |
-| Paddles / sequential | Walk the virtual 6-speed (R/N/1-6); capped at slot 6 |
-| H-pattern shifter | Set `H_PATTERN = true` at the top of `script.lua`; gates 1-6 map per profile, **slot 7 engages AUTO (D)** |
+| Paddles / sequential | Set `H_PATTERN = false` at the top of `script.lua`; walk the virtual 6-speed (R/N/1-6), capped at slot 6 |
+| H-pattern shifter | `H_PATTERN = true` (the default); gates 1-6 map per profile, **gate 7 engages AUTO (D)** |
 
 ## Installation
 
