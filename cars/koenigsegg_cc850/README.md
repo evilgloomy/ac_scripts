@@ -20,8 +20,12 @@ nine gears.
 |---|---|
 | `EXTRA A` | Toggle NORMAL / TRACK profile (manual mode only) |
 | `EXTRA C` | Toggle AUTO (D) |
-| Paddles / sequential | Set `H_PATTERN = false` at the top of `script.lua`; walk the virtual 6-speed (R/N/1-6), capped at slot 6 |
-| H-pattern shifter | `H_PATTERN = true` (the default); gates 1-6 map per profile, **gate 7 engages AUTO (D)** |
+| Paddles / sequential | Walk the virtual 6-speed (R/N/1-6), capped at slot 6 |
+| H-pattern shifter | Gates 1-6 map per profile, **gate 7 engages AUTO (D)** |
+
+The controller type is **auto-detected** — paddles and an H-pattern shifter both
+just work, with nothing to configure. The Lua Debug app shows the detected input
+as `ESS detected input`.
 
 ## Installation
 
@@ -56,12 +60,13 @@ nine gears.
   shift, so its clutch/engagement logic never runs alongside the forced gear —
   that parallel box is exactly what caused the residual drivetrain slip, and
   leaving it parked is what keeps this version clean.
-- With an **H-pattern shifter** (`H_PATTERN = true`) the gate is selected
-  directly via `carPh.requestedGearIndex`. The script reads it and maps the gate
-  straight to the virtual slot (gate 1 → slot 1, gate 2 → slot 2, …), exactly the
-  same slot the paddles drive in controller mode. From there the normal slot →
-  mapped LST gear logic takes over — so gate 1 is LST 2nd in NORMAL, LST 3rd in
-  TRACK. Gate 7 engages AUTO. The script never writes the input field.
+- **Controller type is auto-detected**, so there's no flag to set. An H-pattern
+  shifter moves `carPh.requestedGearIndex` directly, so a change there is read as
+  a gate selection and mapped straight to the virtual slot (gate 1 → slot 1, …).
+  Paddles/sequential walk the slot by `gearUp`/`gearDown` edges, which the script
+  swallows — so `requestedGearIndex` stays parked and the two inputs can't be
+  confused. Either way it's the same virtual slot, so the normal slot → mapped
+  LST gear logic takes over (gate 1 is LST 2nd in NORMAL, LST 3rd in TRACK).
 - The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
   shows the virtual slot (or the AUTO gear) without touching physics. Toggle
   with `SHOW_VIRTUAL_GEAR`.
@@ -81,8 +86,9 @@ Everything lives at the top of `script.lua`:
 
 - `PROFILES.NORMAL` / `PROFILES.TRACK`: gear maps, throttle exponent,
   AUTO shift RPMs, shift blend time, shift cooldown, damper multipliers.
-- `H_PATTERN`, `REVERSE_MAX_KMH`, `MANUAL_SHIFT_TIME`, `SHOW_VIRTUAL_GEAR`
+- `REVERSE_MAX_KMH`, `MANUAL_SHIFT_TIME`, `SHOW_VIRTUAL_GEAR`
   (set `false` to show the physical LST gear on the dash instead of the slot).
+  Controller type needs no setting — it's auto-detected.
 - `CLUTCH_HARD_LOCK` (on by default; `false` = plain bypass, slip returns) and
   `CLUTCH_HOME` (clutch fraction at/above which the lock engages — raise toward
   1.0 if any slip remains, lower if the clutch grabs too early off the line).

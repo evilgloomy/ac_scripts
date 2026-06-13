@@ -15,10 +15,13 @@
 -- + (best-effort) damper stiffness:
 --   NORMAL: slots 1-6 -> LST 2, 4, 6, 7, 8, 9, softer throttle, baseline dampers
 --   TRACK:  slots 1-6 -> LST 3, 4, 5, 6, 7, 8, linear throttle, stiffer dampers
--- Toggle with EXTRA_A. EXTRA_C engages AUTO (D); with an H-pattern shifter
--- slot 7 does the same. D shifts through all nine LST gears by RPM.
+-- Toggle with EXTRA_A. EXTRA_C engages AUTO (D); with an H-pattern shifter the
+-- top gate (7) does the same. D shifts through all nine LST gears by RPM.
+--
+-- Controller type is auto-detected each frame — no flag to set. An H-pattern
+-- shifter moves requestedGearIndex directly; paddles/sequential use gearUp/Down
+-- edges (which we swallow), so the two never get confused.
 
-local H_PATTERN         = true   -- true = H-pattern shifter, false = paddles/sequential
 local REVERSE_MAX_KMH   = 5      -- only shift into R below this speed
 local MANUAL_SHIFT_TIME = 0.04   -- LST engages near-instantly in manual
 local SHOW_VIRTUAL_GEAR = true   -- dash shows slot number, not physical gear
@@ -128,6 +131,8 @@ local blendTime  = MANUAL_SHIFT_TIME
 local extraAPrev, extraCPrev = false, false
 local prevUp, prevDown = false, false
 local controlsWritable = nil
+local lastRaw    = nil     -- previous requestedGearIndex, to spot H-shifter moves
+local lastInput  = 'none'  -- 'H-pattern' or 'sequential', auto-detected
 local lastProfile = nil
 local warned = false
 
@@ -221,18 +226,26 @@ function script.update(dt)
     end
   end
 
-  if H_PATTERN then
-    -- The shifter selects a gate directly via requestedGearIndex. Just read it
-    -- (never write it — writing destroys the input). raw 0=R, 1=N, 2..7 -> gates
-    -- 1..6, 8 -> auto gate. Gate number maps straight to the virtual slot.
-    local raw = carPh.requestedGearIndex
+  -- INPUT (auto-detected, no flag to set):
+  -- * H-pattern shifter — writes the selected gate straight into
+  --   requestedGearIndex, so any change there is a direct gate selection. With
+  --   paddles we swallow gearUp/gearDown above, AC's box stays parked and this
+  --   value never moves on its own, so the block is inert for paddle users.
+  -- * Paddles / sequential — walk the slot by gearUp/gearDown edges.
+  local raw = carPh.requestedGearIndex
+  if lastRaw ~= nil and raw ~= lastRaw then
+    lastInput = 'H-pattern'
     if raw == 8 then
-      if not autoMode then enterAuto() end
+      if not autoMode then enterAuto() end          -- top gate engages AUTO (D)
     elseif raw >= 0 and raw <= 7 then
       if autoMode then exitAuto() end
-      slot = raw - 1                   -- raw 1=N->slot 0, 2=gate1->slot 1, ...
+      slot = raw - 1                                 -- raw 1=N->0, 2..7->gates 1..6
     end
-  elseif not autoMode then
+  end
+  lastRaw = raw
+
+  if not autoMode then
+    if upEdge or downEdge then lastInput = 'sequential' end
     if upEdge then slot = math.min(slot + 1, 6) end
     if downEdge then
       local floor = (car.speedKmh < REVERSE_MAX_KMH) and -1 or 0
@@ -333,10 +346,10 @@ function script.update(dt)
 
   ac.debug('ESS mode', autoMode and 'AUTO (D)' or ('MANUAL ' .. profile))
   ac.debug('ESS DIAG', string.format(
-    'H_PATTERN=%s  requested=%s  slot=%s  engaged=%s  AC_gear=%s',
-    tostring(H_PATTERN), tostring(carPh.requestedGearIndex), tostring(slot),
+    'input=%s  requested=%s  slot=%s  engaged=%s  AC_gear=%s',
+    lastInput, tostring(carPh.requestedGearIndex), tostring(slot),
     tostring(engaged), tostring(hasCarPhGear and carPh.gear or 'n/a')))
-  ac.debug('ESS H_PATTERN flag', H_PATTERN)
+  ac.debug('ESS detected input', lastInput)
   ac.debug('ESS virtual slot', slot)
   ac.debug('ESS engaged physical gear', engaged)
   ac.debug('ESS requestedGearIndex (raw)', carPh.requestedGearIndex)
