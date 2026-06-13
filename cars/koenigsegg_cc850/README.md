@@ -59,9 +59,11 @@ nine gears.
 - With an **H-pattern shifter** (`H_PATTERN = true`) there are no paddle inputs
   to swallow — the gate is selected directly via `carPh.requestedGearIndex`, and
   AC would otherwise engage that raw 1-6 gate and override the forced gear. So
-  the script reads the gate, then writes the mapped LST gear back into
-  `requestedGearIndex` (the dog-leg remap technique) so AC's box engages what
-  you intend. Manual only — AUTO leaves the input alone.
+  the script reads the gate (by change, so it survives builds that don't
+  re-sample the shifter each frame) to set the virtual slot, then parks
+  `requestedGearIndex` at **neutral** every frame. That puts AC's box in the
+  exact state controller mode uses — neutral, with the forced gear doing all the
+  driving — so the override wins cleanly. AUTO leaves the input alone.
 - The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
   shows the virtual slot (or the AUTO gear) without touching physics. Toggle
   with `SHOW_VIRTUAL_GEAR`.
@@ -99,3 +101,7 @@ Everything lives at the top of `script.lua`:
   native shift animation/sound; the dash gear is driven by the display-only
   override instead. The engaged physical gear is always visible in the Lua
   Debug app.
+- H-pattern only: because the neutral park value shares the raw code of the N
+  gate, deliberately *resting* the shifter in neutral isn't registered (the car
+  holds its last gear). Passing through neutral mid-shift is fine and is in fact
+  filtered out on purpose. Use the clutch to coast, or shift to a gear.
