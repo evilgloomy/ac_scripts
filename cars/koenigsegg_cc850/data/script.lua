@@ -57,6 +57,10 @@ local PROFILES = {
 
 local carPh = ac.accessCarPhysics()
 
+-- carPh.gear is the raw gear AC has actually engaged (0=R, 1=N, 2=1st). It isn't
+-- exposed on every build, so probe once. The H-pattern ratio correction uses it.
+local hasCarPhGear = pcall(function() return carPh.gear end)
+
 -- Read drivetrain numbers so the ini stays the single source of truth
 local cfg = ac.INIConfig.carData(car.index, 'drivetrain.ini')
 local finalRatio = cfg:get('GEARS', 'FINAL', 3.2)
@@ -124,10 +128,6 @@ local blendTime  = MANUAL_SHIFT_TIME
 local extraAPrev, extraCPrev = false, false
 local prevUp, prevDown = false, false
 local controlsWritable = nil
-local requestedWritable = nil
-local prevRequest = nil   -- last requestedGearIndex value we left in the field,
-                          -- so H-pattern reads can tell a fresh gate selection
-                          -- from our own parked value
 local lastProfile = nil
 local warned = false
 
@@ -196,9 +196,6 @@ function script.update(dt)
   if controlsWritable == nil then
     controlsWritable = pcall(function() carPh.gearUp = carPh.gearUp end)
   end
-  if requestedWritable == nil then
-    requestedWritable = pcall(function() carPh.requestedGearIndex = carPh.requestedGearIndex end)
-  end
   if controlsWritable then
     carPh.gearUp, carPh.gearDown = false, false
   end
@@ -225,20 +222,15 @@ function script.update(dt)
   end
 
   if H_PATTERN then
-    -- The shifter selects a gate via requestedGearIndex. We can't just read it
-    -- every frame: in section 5 we overwrite the field to park AC's box, and on
-    -- builds that don't re-sample the shifter that parked value is what we'd
-    -- read back. So treat a value as a *fresh* gate selection only when it
-    -- differs from what we last parked (prevRequest). Holding a gate re-reads
-    -- the same number harmlessly; our park value is filtered out.
+    -- The shifter selects a gate directly via requestedGearIndex. Just read it
+    -- (never write it — writing destroys the input). raw 0=R, 1=N, 2..7 -> gates
+    -- 1..6, 8 -> auto gate. Gate number maps straight to the virtual slot.
     local raw = carPh.requestedGearIndex
-    if raw ~= prevRequest then
-      if raw == 8 then
-        if not autoMode then enterAuto() end
-      elseif raw >= 0 and raw <= 7 then
-        if autoMode then exitAuto() end
-        slot = raw - 1                 -- raw 0=R→-1, 1=N→0, 2..7→1..6
-      end
+    if raw == 8 then
+      if not autoMode then enterAuto() end
+    elseif raw >= 0 and raw <= 7 then
+      if autoMode then exitAuto() end
+      slot = raw - 1                   -- raw 1=N->slot 0, 2=gate1->slot 1, ...
     end
   elseif not autoMode then
     if upEdge then slot = math.min(slot + 1, 6) end
@@ -307,24 +299,23 @@ function script.update(dt)
     blendMult = 1
   end
 
-  ac.overrideSpecificValue(ac.CarPhysicsValueID.DrivetrainEngagedGear, engaged + 1)
-  ac.setGearsFinalRatio(finalRatio * blendMult)
-
-  -- H-pattern engagement: park AC's own box in NEUTRAL (raw 1) every frame so it
-  -- never engages the raw 1-6 gate and fight the forced gear. This is exactly
-  -- the state controller mode runs in — AC box neutral, the DrivetrainEngagedGear
-  -- override doing all the driving — which is why that path is slip-free and
-  -- correct. We record what we parked in prevRequest so next frame's gate read
-  -- can distinguish a real selection from this value. AUTO leaves the field
-  -- alone (the auto gate is already non-drivable, override already wins).
-  if H_PATTERN then
-    if not autoMode and requestedWritable then
-      carPh.requestedGearIndex = 1
-      prevRequest = 1
-    else
-      prevRequest = carPh.requestedGearIndex
-    end
+  -- H-pattern ratio correction. An H-shifter writes its gate straight into
+  -- requestedGearIndex and AC engages that physical gate (1-6); we can't stop it
+  -- without overwriting the input and destroying our own gate read. So instead of
+  -- fighting it, read the gear AC actually engaged (carPh.gear) and scale the
+  -- final ratio so the EFFECTIVE ratio equals the mapped LST gear's. This is
+  -- self-correcting: if the override below wins (AC already in `engaged`) the
+  -- factor is 1; if AC keeps the raw gate, the factor remaps the gate's ratio
+  -- onto the LST gear's, so e.g. gate 1 in NORMAL drives exactly like LST 2nd.
+  local acGear = (hasCarPhGear and carPh.gear or 0) - 1   -- 1-based forward gear
+  local ratioCorrection = 1
+  if H_PATTERN and not autoMode and engaged > 0
+      and acGear >= 1 and acGear <= gearsCount then
+    ratioCorrection = ratios[engaged] / ratios[acGear]
   end
+
+  ac.overrideSpecificValue(ac.CarPhysicsValueID.DrivetrainEngagedGear, engaged + 1)
+  ac.setGearsFinalRatio(finalRatio * blendMult * ratioCorrection)
 
   -- ====================================================================
   -- 5b. CLUTCH HARD-LOCK (kills the override-driven drivetrain slip)
@@ -360,9 +351,9 @@ function script.update(dt)
   ac.debug('ESS engaged physical gear', engaged)
   ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
   ac.debug('ESS controls writable', controlsWritable)
-  ac.debug('ESS requested writable', requestedWritable)
   ac.debug('ESS requestedGearIndex (raw)', carPh.requestedGearIndex)
-  ac.debug('ESS prevRequest (parked)', prevRequest)
+  ac.debug('ESS AC engaged gear (raw)', hasCarPhGear and carPh.gear or 'n/a')
+  ac.debug('ESS ratio correction', ratioCorrection)
   ac.debug('ESS rpm', carPh.rpm)
   ac.debug('ESS clutch (1=home 0=open)', carPh.clutch)
   ac.debug('ESS drivetrain lock', lockState)
