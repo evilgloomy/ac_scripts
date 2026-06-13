@@ -332,6 +332,10 @@ function script.update(dt)
   end
 
   ac.debug('ESS mode', autoMode and 'AUTO (D)' or ('MANUAL ' .. profile))
+  ac.debug('ESS DIAG', string.format(
+    'H_PATTERN=%s  requested=%s  slot=%s  engaged=%s  AC_gear=%s',
+    tostring(H_PATTERN), tostring(carPh.requestedGearIndex), tostring(slot),
+    tostring(engaged), tostring(hasCarPhGear and carPh.gear or 'n/a')))
   ac.debug('ESS H_PATTERN flag', H_PATTERN)
   ac.debug('ESS virtual slot', slot)
   ac.debug('ESS engaged physical gear', engaged)
