@@ -39,11 +39,10 @@ nine gears.
    SUPPORTS_SHIFTER=1        ; required, even for controller use
    ```
 4. Drive. Open the **Lua Debug** app in-game to see live `ESS …` values
-   (mode, virtual slot, engaged physical gear, RPM, damper API). The display
-   diagnostics — `display gear (pushed)`, `carPh.gear (physics raw)` and
-   `car.gear (render)` — show whether the cosmetic dash override is landing:
-   if `pushed` is correct but the dash shows a different number, this car's
-   dash binding is ignoring the render override.
+   (mode, virtual slot, engaged physical gear, RPM, clutch, damper API). The
+   `ESS drivetrain lock` line reports the clutch hard-lock state: `LOCKED`
+   while driving, `tracking` in N/R or while declutching, or `ID NOT FOUND`
+   if this CSP build doesn't expose the clutch-override values.
 
 ## How it works (short version)
 
@@ -60,7 +59,12 @@ nine gears.
 - The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
   shows the virtual slot (or the AUTO gear) without touching physics. Toggle
   with `SHOW_VIRTUAL_GEAR`.
-- Clutch is left entirely to AC's own handling — there is no clutch override.
+- The drivetrain clutch is **hard-locked** while driving (`CLUTCH_HARD_LOCK`).
+  Forcing the engaged gear leaves the clutch coupling a few percent open on its
+  own — felt most in tall gears — so the script overrides the coupling to a
+  full lock whenever you're in a forward gear with the clutch fully home, and
+  releases it (tracking the real clutch) in N/R or while you declutch. Set
+  `CLUTCH_HARD_LOCK = false` for plain bypass behavior (the slip returns).
 - Gear-ratio blending across shifts (`ac.setGearsFinalRatio`) smooths RPM
   transitions: ~0.1 s in NORMAL auto, ~0.04 s in TRACK / manual (the LST
   engages near-instantly).
@@ -73,6 +77,9 @@ Everything lives at the top of `script.lua`:
   AUTO shift RPMs, shift blend time, shift cooldown, damper multipliers.
 - `H_PATTERN`, `REVERSE_MAX_KMH`, `MANUAL_SHIFT_TIME`, `SHOW_VIRTUAL_GEAR`
   (set `false` to show the physical LST gear on the dash instead of the slot).
+- `CLUTCH_HARD_LOCK` (on by default; `false` = plain bypass, slip returns) and
+  `CLUTCH_HOME` (clutch fraction at/above which the lock engages — raise toward
+  1.0 if any slip remains, lower if the clutch grabs too early off the line).
 
 ## Known limitations
 

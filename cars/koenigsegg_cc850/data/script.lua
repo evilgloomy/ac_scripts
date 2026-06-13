@@ -22,6 +22,11 @@ local H_PATTERN         = false  -- set true for an H-pattern shifter
 local REVERSE_MAX_KMH   = 5      -- only shift into R below this speed
 local MANUAL_SHIFT_TIME = 0.04   -- LST engages near-instantly in manual
 local SHOW_VIRTUAL_GEAR = true   -- dash shows slot number, not physical gear
+local CLUTCH_HARD_LOCK  = true   -- forcing the engaged gear leaves the clutch
+                                 -- coupling a few % open (worst in tall gears);
+                                 -- this hard-locks it while driving. Set false
+                                 -- for plain V4 behavior (slip returns).
+local CLUTCH_HOME       = 0.98   -- clutch at/above this counts as fully home
 
 local PROFILES = {
   NORMAL = {
@@ -51,10 +56,6 @@ local PROFILES = {
 }
 
 local carPh = ac.accessCarPhysics()
-
--- carPh.gear (physics-side raw gear) isn't exposed on every CSP build; probe
--- once so the debug read-out below can degrade gracefully instead of erroring.
-local hasCarPhGear = pcall(function() return carPh.gear end)
 
 -- Read drivetrain numbers so the ini stays the single source of truth
 local cfg = ac.INIConfig.carData(car.index, 'drivetrain.ini')
@@ -95,6 +96,20 @@ local damperApi = tryAccessDampers()
 
 local hasOverride = ac.CarPhysicsValueID ~= nil and ac.overrideSpecificValue ~= nil
   and ac.setGearsFinalRatio ~= nil
+
+-- Clutch-coupling override IDs. The DrivetrainEngagedGear override alone never
+-- fully locks the drivetrain clutch — it slips a few percent, felt most in tall
+-- gears. These are the same values CSP's automatic-transmission module uses to
+-- force a full lock. Probe gracefully: they aren't exposed on every build, and
+-- without them we fall back to plain (slipping) behavior.
+local idClutchOverride, idOpenThreshold
+do
+  local ok1, v1 = pcall(function() return ac.CarPhysicsValueID.DrivetrainClutchOverride end)
+  local ok2, v2 = pcall(function() return ac.CarPhysicsValueID.DrivetrainOpenThreshold end)
+  if ok1 and v1 ~= nil and ok2 and v2 ~= nil then
+    idClutchOverride, idOpenThreshold = v1, v2
+  end
+end
 
 local profile    = 'NORMAL'
 local autoMode   = false
@@ -281,30 +296,40 @@ function script.update(dt)
   ac.setGearsFinalRatio(finalRatio * blendMult)
 
   -- ====================================================================
-  -- 6. COSMETIC GEAR DISPLAY (render thread only — never touches physics)
+  -- 5b. CLUTCH HARD-LOCK (kills the override-driven drivetrain slip)
   -- ====================================================================
-  -- ac.overrideCarState('gear', …) overrides only the value AC's rendering
-  -- thread uses for the dash; the SDK is explicit it "doesn't affect actual
-  -- physics". Encoding matches car.gear: -1 = R, 0 = N, 1..n = forward gears,
-  -- which is exactly how `slot` is numbered, so the dash shows the virtual
-  -- slot directly. In AUTO we show the live physical gear the script engaged.
-  -- Pushed every frame because the forced engaged gear keeps writing the
-  -- physical LST gear into the same value otherwise.
-  local displayGear = autoMode and autoGear or slot
+  -- Only lock when actually in a forward gear with the clutch fully home. In
+  -- N/R, or while the player is genuinely declutching (launch / stop), we track
+  -- the real clutch instead so creep, clutch starts and stalling stay intact.
+  local clutch = math.saturate(carPh.clutch)
+  local lockState = 'off'
+  if CLUTCH_HARD_LOCK and idClutchOverride ~= nil then
+    if engaged > 0 and clutch >= CLUTCH_HOME then
+      ac.overrideSpecificValue(idClutchOverride, 1.0)   -- couple fully
+      ac.overrideSpecificValue(idOpenThreshold, 0.05)   -- only open below 0.05
+      lockState = 'LOCKED'
+    else
+      ac.overrideSpecificValue(idClutchOverride, clutch)
+      ac.overrideSpecificValue(idOpenThreshold, 0)
+      lockState = 'tracking (N/R or declutch)'
+    end
+  elseif CLUTCH_HARD_LOCK then
+    lockState = 'ID NOT FOUND'
+  end
+
+  -- ====================================================================
+  -- 6. DISPLAY + DEBUG
+  -- ====================================================================
   if SHOW_VIRTUAL_GEAR then
-    ac.overrideCarState('gear', displayGear)
+    ac.overrideCarState('gear', autoMode and autoGear or slot)
   end
 
   ac.debug('ESS mode', autoMode and 'AUTO (D)' or ('MANUAL ' .. profile))
   ac.debug('ESS virtual slot', slot)
   ac.debug('ESS engaged physical gear', engaged)
-  -- Display diagnostics: if 'pushed' is right but the dash shows something
-  -- else, the override is being ignored by this car's dash binding. Compare
-  -- against the raw physics gear (carPh.gear) and the render gear (car.gear).
-  ac.debug('ESS display gear (pushed)', displayGear)
-  ac.debug('ESS carPh.gear (physics raw)', hasCarPhGear and carPh.gear or 'n/a')
-  ac.debug('ESS car.gear (render)', car.gear)
   ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
   ac.debug('ESS controls writable', controlsWritable)
   ac.debug('ESS rpm', carPh.rpm)
+  ac.debug('ESS clutch (1=home 0=open)', carPh.clutch)
+  ac.debug('ESS drivetrain lock', lockState)
 end
