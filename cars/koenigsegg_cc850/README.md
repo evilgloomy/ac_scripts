@@ -18,7 +18,7 @@ nine gears.
 
 | Binding (AC controls → Custom Shaders Patch) | Action |
 |---|---|
-| `EXTRA A` | Toggle NORMAL / TRACK profile (manual mode only) |
+| `EXTRA A` | Toggle NORMAL / TRACK profile (works in manual and AUTO) |
 | `EXTRA C` | Toggle AUTO (D) |
 | Paddles / sequential | Walk the virtual 6-speed (R/N/1-6), capped at slot 6 |
 | H-pattern shifter | Gates 1-6 map per profile, **gate 7 engages AUTO (D)** |

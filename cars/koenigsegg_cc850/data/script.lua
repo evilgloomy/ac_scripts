@@ -220,16 +220,14 @@ function script.update(dt)
     carPh.gearUp, carPh.gearDown = false, false
   end
 
-  -- EXTRA_A: toggle manual profile
+  -- EXTRA_A: toggle drive profile. Works in manual AND AUTO — in AUTO it swaps
+  -- the whole profile (shift map, shift speed, throttle curve, dampers) between
+  -- NORMAL and TRACK, so you can run D in either character.
   if car.extraA ~= extraAPrev then
     extraAPrev = car.extraA
     if car.extraA then
-      if autoMode then
-        message('ESS', 'Leave D to change profiles')
-      else
-        profile = (profile == 'NORMAL') and 'TRACK' or 'NORMAL'
-        message('ESS', profile .. ' profile engaged')
-      end
+      profile = (profile == 'NORMAL') and 'TRACK' or 'NORMAL'
+      message('ESS', profile .. (autoMode and ' (AUTO)' or '') .. ' profile engaged')
     end
   end
 
@@ -273,6 +271,8 @@ function script.update(dt)
   -- ====================================================================
   if profile ~= lastProfile then
     lastProfile = profile
+    p = PROFILES[profile]   -- refresh: a toggle this frame (above) must take
+                            -- effect now — shift map, throttle curve and dampers
     applyDamperProfile(p)
   end
 
