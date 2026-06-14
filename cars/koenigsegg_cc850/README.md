@@ -1,5 +1,7 @@
 # Koenigsegg CC850 — Engage Shift System (ESS)
 
+*Coded by VR Driving AI Physics.*
+
 CSP car physics script simulating the CC850's ESS: the physical gearbox is the
 9-speed Light Speed Transmission (LST), but the driver interacts with a
 6-speed manual whose slots map to different physical gears depending on the
@@ -123,3 +125,7 @@ Everything lives at the top of `script.lua`:
 - AC's box is bypassed, so shifts don't trigger AC's native shift
   animation/sound; the dash gear is driven by the display-only override instead.
   The engaged physical gear is always visible in the Lua Debug app.
+
+## Credits
+
+Coded by **VR Driving AI Physics**.

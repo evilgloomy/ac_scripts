@@ -14,3 +14,7 @@ Custom Shaders Patch (CSP) Lua scripts for Assetto Corsa.
 - Content Manager recommended
 
 Each car folder has its own README with installation and configuration details.
+
+## Credits
+
+Coded by **VR Driving AI Physics**.

@@ -1,4 +1,5 @@
 -- Koenigsegg CC850 Engage Shift System (ESS) + Drive-mode tuning
+-- Coded by VR Driving AI Physics
 -- CSP car physics script — must live at <car>/data/script.lua
 --
 -- Requires:
@@ -68,8 +69,8 @@ local PROFILES = {
 
 local carPh = ac.accessCarPhysics()
 
--- carPh.gear is the raw gear AC has actually engaged (0=R, 1=N, 2=1st). It isn't
--- exposed on every build, so probe once. The H-pattern ratio correction uses it.
+-- carPh.gear is the raw gear AC has actually engaged (0=R, 1=N, 2=1st). Not
+-- exposed on every build, so probe once; shown in the Lua Debug app.
 local hasCarPhGear = pcall(function() return carPh.gear end)
 
 -- Read drivetrain numbers so the ini stays the single source of truth
@@ -395,21 +396,13 @@ function script.update(dt)
     ac.overrideCarState('gear', autoMode and autoGear or slot)
   end
 
-  ac.debug('ESS mode', autoMode and 'AUTO (D)' or ('MANUAL ' .. profile))
-  ac.debug('ESS DIAG', string.format(
-    'input=%s  requested=%s  slot=%s  engaged=%s  AC_gear=%s',
-    lastInput, tostring(carPh.requestedGearIndex), tostring(slot),
-    tostring(engaged), tostring(hasCarPhGear and carPh.gear or 'n/a')))
-  ac.debug('ESS detected input', lastInput)
-  ac.debug('ESS virtual slot', slot)
-  ac.debug('ESS engaged physical gear', engaged)
-  ac.debug('ESS requestedGearIndex (raw)', carPh.requestedGearIndex)
-  ac.debug('ESS AC engaged gear (raw)', hasCarPhGear and carPh.gear or 'n/a')
-  ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
-  ac.debug('ESS controls writable', controlsWritable)
-  ac.debug('ESS rpm', carPh.rpm)
+  ac.debug('ESS mode', (autoMode and 'AUTO (D) — ' or 'MANUAL — ') .. profile)
+  ac.debug('ESS input', lastInput)
+  ac.debug('ESS slot / engaged / AC gear', string.format('%s / %s / %s',
+    tostring(slot), tostring(engaged), tostring(hasCarPhGear and carPh.gear or 'n/a')))
+  ac.debug('ESS rpm', math.floor(carPh.rpm))
   ac.debug('ESS auto shift up/down @gas', string.format(
     '%.0f / %.0f @ %.2f', upRpm, downRpm, rawGas))
-  ac.debug('ESS clutch (1=home 0=open)', carPh.clutch)
-  ac.debug('ESS drivetrain lock', lockState)
+  ac.debug('ESS clutch / lock', string.format('%.2f / %s', carPh.clutch, lockState))
+  ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
 end
