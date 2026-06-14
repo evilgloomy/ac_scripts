@@ -75,6 +75,10 @@ as `ESS detected input`.
 - The dash gear is a **display-only** override: `ac.overrideCarState('gear', …)`
   shows the virtual slot (or the AUTO gear) without touching physics. Toggle
   with `SHOW_VIRTUAL_GEAR`.
+- **AUTO (D)** uses a throttle-adaptive shift map: the up/downshift RPMs are
+  lerped between a light-throttle and a full-throttle value by pedal position, so
+  cruising upshifts early and keeps revs low while flooring it holds each gear to
+  near redline and kicks down harder — like a real load-based shift schedule.
 - In **AUTO (D)** there's no driver clutch, so the script slips the clutch itself
   below `AUTO_LAUNCH_KMH`: a gentle creep off the brake, more as you press the
   throttle, fully locked once rolling. This lets it pull away from a standstill
@@ -94,7 +98,10 @@ as `ESS detected input`.
 Everything lives at the top of `script.lua`:
 
 - `PROFILES.NORMAL` / `PROFILES.TRACK`: gear maps, throttle exponent,
-  AUTO shift RPMs, shift blend time, shift cooldown, damper multipliers.
+  throttle-adaptive AUTO shift map (`upshiftLightRpm`/`upshiftFullRpm` and
+  `downshiftLightRpm`/`downshiftFullRpm` — the up/down RPMs at light vs full
+  throttle, lerped by pedal position), shift blend time, shift cooldown, damper
+  multipliers.
 - `REVERSE_MAX_KMH`, `MANUAL_SHIFT_TIME`, `SHOW_VIRTUAL_GEAR`
   (set `false` to show the physical LST gear on the dash instead of the slot).
   Controller type needs no setting — it's auto-detected.

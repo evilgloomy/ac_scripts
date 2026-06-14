@@ -39,8 +39,11 @@ local PROFILES = {
   NORMAL = {
     gears        = { 2, 4, 6, 7, 8, 9 },
     throttleExp  = 1.35,   -- > 1 softens initial pedal travel
-    upshiftRpm   = 7400,
-    downshiftRpm = 2400,
+    -- AUTO shift map: thresholds scale with throttle. Light pedal upshifts early
+    -- and lets it lug a little (relaxed cruising); full pedal holds to near
+    -- redline and kicks down hard.
+    upshiftLightRpm   = 4400, upshiftFullRpm   = 7400,
+    downshiftLightRpm = 1500, downshiftFullRpm = 3600,
     shiftTime    = 0.10,
     cooldown     = 0.45,
     damping      = {       -- multipliers vs baseline from suspensions.ini
@@ -51,8 +54,9 @@ local PROFILES = {
   TRACK = {
     gears        = { 3, 4, 5, 6, 7, 8 },
     throttleExp  = 1.00,   -- linear pedal in Track
-    upshiftRpm   = 8200,
-    downshiftRpm = 3200,
+    -- Aggressive map: keeps revs up even at part throttle, holds to redline flat.
+    upshiftLightRpm   = 6000, upshiftFullRpm   = 8200,
+    downshiftLightRpm = 2400, downshiftFullRpm = 4800,
     shiftTime    = 0.04,
     cooldown     = 0.25,
     damping      = {
@@ -195,6 +199,9 @@ function script.update(dt)
 
   local p = PROFILES[profile]
   cooldown = math.max(0, cooldown - dt)
+  local rawGas = math.saturate(carPh.gas)   -- driver throttle intent, captured
+                                             -- before the throttle curve reshapes
+                                             -- carPh.gas in section 3
 
   -- ====================================================================
   -- 1. INPUTS
@@ -279,12 +286,17 @@ function script.update(dt)
   end
 
   -- ====================================================================
-  -- 4. AUTO (D) SHIFT LOGIC
+  -- 4. AUTO (D) SHIFT LOGIC — throttle-adaptive shift map
   -- ====================================================================
+  -- Shift thresholds rise with throttle: ease off and it upshifts early to keep
+  -- revs down; bury the pedal and it holds each gear toward redline and kicks
+  -- down at a higher RPM. Same idea as a real auto's load-based shift schedule.
+  local upRpm   = math.lerp(p.upshiftLightRpm, p.upshiftFullRpm, rawGas)
+  local downRpm = math.lerp(p.downshiftLightRpm, p.downshiftFullRpm, rawGas)
   if autoMode and cooldown == 0 then
-    if carPh.rpm > p.upshiftRpm and autoGear < gearsCount then
+    if carPh.rpm > upRpm and autoGear < gearsCount then
       autoGear, cooldown = autoGear + 1, p.cooldown
-    elseif carPh.rpm < p.downshiftRpm and autoGear > 1 then
+    elseif carPh.rpm < downRpm and autoGear > 1 then
       autoGear, cooldown = autoGear - 1, p.cooldown
     end
   end
@@ -396,6 +408,8 @@ function script.update(dt)
   ac.debug('ESS damper API', damperApi or 'NOT AVAILABLE')
   ac.debug('ESS controls writable', controlsWritable)
   ac.debug('ESS rpm', carPh.rpm)
+  ac.debug('ESS auto shift up/down @gas', string.format(
+    '%.0f / %.0f @ %.2f', upRpm, downRpm, rawGas))
   ac.debug('ESS clutch (1=home 0=open)', carPh.clutch)
   ac.debug('ESS drivetrain lock', lockState)
 end
