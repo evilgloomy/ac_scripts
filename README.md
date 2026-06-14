@@ -7,6 +7,7 @@ Custom Shaders Patch (CSP) Lua scripts for Assetto Corsa.
 | Script | Description |
 |---|---|
 | [`cars/koenigsegg_cc850`](cars/koenigsegg_cc850) | Koenigsegg CC850 Engage Shift System (ESS): a virtual 6-speed manual layered over the 9-speed Light Speed Transmission, with Normal/Track drive modes and a full AUTO (D) mode. |
+| [`cars/active_steering`](cars/active_steering) | BMW E60-style Active Steering: speed-variable steering ratio (quick for parking, slow and stable at speed), with Comfort/Sport schedules. Drop-in for any car. |
 
 ## Requirements
 
