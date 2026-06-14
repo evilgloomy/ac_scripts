@@ -59,6 +59,9 @@ local profile      = 'COMFORT'
 local enabled      = ENABLED_AT_START
 local steerWritable = nil   -- probed once; false on builds that lock the input
 local extraAPrev, extraCPrev = false, false
+local totalTime     = 0     -- debug heartbeat clock (proves the update loop runs)
+local frames        = 0     -- debug heartbeat frame counter
+local loadAnnounced = false -- fire the one-time on-load system message once
 
 local function message(title, desc)
   if ac.setSystemMessage ~= nil then ac.setSystemMessage(title, desc) end
@@ -75,6 +78,7 @@ end
 
 function script.reset()
   profile, enabled = 'COMFORT', ENABLED_AT_START
+  totalTime, frames = 0, 0
 end
 
 function script.update(dt)
@@ -124,20 +128,35 @@ function script.update(dt)
   end
 
   -- ====================================================================
-  -- DEBUG (Lua Debug app) — show the effective ratio the driver feels now.
+  -- DEBUG (Lua Debug app) — proves the script is live and actually working.
   -- ====================================================================
+  totalTime = totalTime + dt
+  frames    = frames + 1
+  if not loadAnnounced then
+    loadAnnounced = true
+    message('Active Steering', enabled and ('ACTIVE — ' .. profile) or 'loaded (OFF)')
+  end
+
   -- A higher gain divides the stock ratio down (quicker); a lower gain
   -- multiplies it up (slower). Effective lock-to-lock turns scale the same way.
+  local applied  = enabled and steerWritable
   local effRatio = baseRatio / math.max(1e-3, gain)
   local effTurns = (baseLock / 180) / math.max(1e-3, gain)   -- approx full turns L->R
   local feel = gain > 1.02 and 'quicker' or (gain < 0.98 and 'slower' or 'neutral')
 
+  -- Heartbeat: if this clock and frame count keep climbing, the physics-script
+  -- update loop is genuinely running on this car.
+  ac.debug('AS running', string.format('t=%.1fs   frame %d', totalTime, frames))
   ac.debug('AS state', (enabled and ('ON  ' .. profile) or 'OFF (stock ratio)')
     .. (steerWritable and '' or '   [steer not writable on this CSP build]'))
+  -- Functional proof: is the script overriding steering this frame, and by how
+  -- much? Δ goes non-zero the instant you turn the wheel off-centre.
+  ac.debug('AS modifying steer', applied
+    and string.format('YES   in %+.3f -> out %+.3f   (delta %+.3f)', s, out, out - s)
+    or  (steerWritable and 'no - system OFF' or 'no - steer not writable'))
   ac.debug('AS speed', string.format('%.0f km/h', speed))
   ac.debug('AS gain', string.format('%.2f x   (%s)', gain, feel))
   ac.debug('AS effective ratio', string.format('%.1f : 1   (stock %.1f : 1)', effRatio, baseRatio))
   ac.debug('AS lock-to-lock', string.format('%.1f turns   (stock %.1f)',
     effTurns, (baseLock / 180)))
-  ac.debug('AS steer in/out', string.format('%+.2f -> %+.2f', s, out))
 end

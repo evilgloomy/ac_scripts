@@ -49,10 +49,19 @@ angle (a slower, more stable ratio) — exactly what the real actuator does.
    [HEADER]
    VERSION=extended-2
    ```
-3. Drive. Open the **Lua Debug** app in-game to see live `AS …` values (state,
-   speed, current gain, effective ratio, lock-to-lock and steer in→out). The
-   `AS state` line reports `[steer not writable on this CSP build]` if this CSP
-   build doesn't expose a writable steering input (the script then only displays).
+3. Drive. Active Steering is **ON by default** (`ENABLED_AT_START = true`), and on
+   load it pops a one-time `Active Steering — ACTIVE` message. Open the **Lua
+   Debug** app in-game to confirm it's working — you'll see:
+   - `AS running` — a clock + frame counter that keeps climbing while the
+     physics-script update loop runs (proof the script is live on this car);
+   - `AS modifying steer` — `YES` with the live `in → out (delta)` it's applying
+     (delta goes non-zero the instant you steer off-centre);
+   - plus `AS state`, `AS speed`, `AS gain`, `AS effective ratio` and
+     `AS lock-to-lock`.
+
+   The `AS state` line reports `[steer not writable on this CSP build]` if this
+   CSP build doesn't expose a writable steering input (the script then only
+   displays and never touches physics).
 
 For the most faithful feel, turn off AC's gameplay steering aids (no
 steering assist) so the only thing shaping the ratio is this script.
