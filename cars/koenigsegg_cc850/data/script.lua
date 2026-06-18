@@ -22,6 +22,9 @@
 -- Controller type is auto-detected each frame — no flag to set. An H-pattern
 -- shifter moves requestedGearIndex directly; paddles/sequential use gearUp/Down
 -- edges (which we swallow), so the two never get confused.
+--
+-- AI-driven cars are skipped entirely (they get no player input) and run the
+-- stock 9-speed drivetrain.
 
 local REVERSE_MAX_KMH   = 5      -- only shift into R below this speed
 local MANUAL_SHIFT_TIME = 0.04   -- LST engages near-instantly in manual
@@ -72,6 +75,16 @@ local carPh = ac.accessCarPhysics()
 -- carPh.gear is the raw gear AC has actually engaged (0=R, 1=N, 2=1st). Not
 -- exposed on every build, so probe once; shown in the Lua Debug app.
 local hasCarPhGear = pcall(function() return carPh.gear end)
+
+-- AI cars don't receive player inputs, and forcing their gearbox would leave
+-- them stuck in neutral (they'd never launch). So the script bows out entirely
+-- for AI-driven cars and lets them run the native 9-speed drivetrain. Probe the
+-- field once; read its value each frame (control can hand off, e.g. autopilot).
+local aiFieldOk = pcall(function() return car.isAIControlled end)
+local function aiControlled()
+  if not aiFieldOk then return false end
+  return car.isAIControlled and true or false
+end
 
 -- Read drivetrain numbers so the ini stays the single source of truth
 local cfg = ac.INIConfig.carData(car.index, 'drivetrain.ini')
@@ -183,12 +196,19 @@ local function exitAuto()
 end
 
 function script.reset()
+  if aiControlled() then return end   -- never touch AI cars
   profile, autoMode, slot, autoGear = 'NORMAL', false, 0, 1
   cooldown, engaged, blendMult, blendPos = 0, 0, 1, 1
   applyDamperProfile(PROFILES.NORMAL)
 end
 
 function script.update(dt)
+  -- AI cars: apply nothing, run the native 9-speed drivetrain.
+  if aiControlled() then
+    ac.debug('ESS mode', 'AI — script disabled (native 9-speed)')
+    return
+  end
+
   if not hasOverride then
     if not warned then
       warned = true

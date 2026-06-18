@@ -125,6 +125,9 @@ Everything lives at the top of `script.lua`:
 - AC's box is bypassed, so shifts don't trigger AC's native shift
   animation/sound; the dash gear is driven by the display-only override instead.
   The engaged physical gear is always visible in the Lua Debug app.
+- AI-driven cars are skipped entirely (the script checks `car.isAIControlled`)
+  and run the stock 9-speed drivetrain, since AI cars get no player input and
+  would otherwise be left stuck in neutral.
 
 ## Credits
 
